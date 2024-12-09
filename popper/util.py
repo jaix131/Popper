@@ -60,6 +60,7 @@ def parse_args():
     parser.add_argument('--anytime-timeout', type=int, default=ANYTIME_TIMEOUT, help=f'Maximum timeout (seconds) for each anytime MaxSAT call (default: {ANYTIME_TIMEOUT})')
     parser.add_argument('--batch-size', type=int, default=BATCH_SIZE, help=f'Combine batch size (default: {BATCH_SIZE})')
     parser.add_argument('--functional-test', default=False, action='store_true', help='Run functional test')
+    parser.add_argument('--tactic-file', type=str, default='hspace_tactics.txt', help='Filename for the output tactics')
     # parser.add_argument('--datalog', default=False, action='store_true', help='EXPERIMENTAL FEATURE: use recall to order literals in rules')
     # parser.add_argument('--no-bias', default=False, action='store_true', help='EXPERIMENTAL FEATURE: do not use language bias')
     # parser.add_argument('--order-space', default=False, action='store_true', help='EXPERIMENTAL FEATURE: search space ordered by size')
@@ -219,7 +220,7 @@ def flatten(xs):
     return [item for sublist in xs for item in sublist]
 
 class Settings:
-    def __init__(self, cmd_line=False, info=True, debug=False, show_stats=True, max_literals=MAX_LITERALS, timeout=TIMEOUT, quiet=False, eval_timeout=EVAL_TIMEOUT, max_examples=MAX_EXAMPLES, max_body=None, max_rules=None, max_vars=None, functional_test=False, kbpath=False, ex_file=False, bk_file=False, bias_file=False, showcons=False, no_bias=False, order_space=False, noisy=False, batch_size=BATCH_SIZE, solver='rc2', anytime_solver=None, anytime_timeout=ANYTIME_TIMEOUT):
+    def __init__(self, cmd_line=False, info=True, debug=False, show_stats=True, max_literals=MAX_LITERALS, timeout=TIMEOUT, quiet=False, eval_timeout=EVAL_TIMEOUT, max_examples=MAX_EXAMPLES, max_body=None, max_rules=None, max_vars=None, functional_test=False, kbpath=False, ex_file=False, bk_file=False, bias_file=False, showcons=False, no_bias=False, order_space=False, noisy=False, batch_size=BATCH_SIZE, solver='rc2', anytime_solver=None, anytime_timeout=ANYTIME_TIMEOUT, tactic_file=False):
 
         if cmd_line:
             args = parse_args()
@@ -245,6 +246,7 @@ class Settings:
             solver = args.solver
             anytime_solver = args.anytime_solver
             anytime_timeout = args.anytime_timeout
+            tactic_file = args.tactic_file
         else:
             if kbpath:
                 self.bk_file, self.ex_file, self.bias_file = load_kbpath(kbpath)
@@ -287,6 +289,7 @@ class Settings:
         self.anytime_solver = anytime_solver
         self.anytime_timeout = anytime_timeout
         self.bkcons_timeout = BKCONS_TIMEOUT
+        self.tactic_file = tactic_file
 
         self.recall = {}
         self.solution = None

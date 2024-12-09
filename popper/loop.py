@@ -283,6 +283,9 @@ class Popper():
                         mdl = mdl_score(fn, fp, prog_size)
                         if settings.debug:
                             settings.logger.debug(f'tp:{tp} fn:{fn} tn:{tn} fp:{fp} mdl:{mdl}')
+                        with open(settings.tactic_file, 'w') as tactic_file:
+                            print("Writing to tactics file")
+                            tactic_file.write(f'{format_prog(prog)}\n% tp: {tp}, tn: {tn}, fp: {fp}, fn: {fn}\n')
                         saved_scores[prog] = [fp, fn, prog_size]
                         if not min_score:
                             min_score = prog_size
