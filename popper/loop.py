@@ -123,6 +123,7 @@ class Popper():
             # once we update the best mdl score, we can prune spec / gen from a better size for some of these
             self.seen_hyp_spec, self.seen_hyp_gen = defaultdict(list), defaultdict(list)
             max_size = min((1 + settings.max_body) * settings.max_rules, num_pos)
+            self.tactic_file = open(settings.tactic_file, 'w')
         else:
             max_size = (1 + settings.max_body) * settings.max_rules
 
@@ -281,11 +282,16 @@ class Popper():
                         tn = num_neg-fp
                         score = tp, fn, tn, fp, prog_size
                         mdl = mdl_score(fn, fp, prog_size)
+                        precision = None
+                        recall = None
+                        if tp + fp > 0:
+                            precision = tp / (tp + fp)
+                        if tp + fn > 0:
+                            recall = tp / (tp + fn)
                         if settings.debug:
                             settings.logger.debug(f'tp:{tp} fn:{fn} tn:{tn} fp:{fp} mdl:{mdl}')
-                        with open(settings.tactic_file, 'w') as tactic_file:
-                            print("Writing to tactics file")
-                            tactic_file.write(f'{format_prog(prog)}\n% tp: {tp}, tn: {tn}, fp: {fp}, fn: {fn}\n')
+                        if (not precision or precision >= settings.precision_bound) and (not recall or recall >= settings.recall_bound):
+                            self.tactic_file.write(f'{format_prog(prog)}\n% tp:{tp} fn:{fn} tn:{tn} fp:{fp} mdl:{mdl}\n')
                         saved_scores[prog] = [fp, fn, prog_size]
                         if not min_score:
                             min_score = prog_size
@@ -405,7 +411,7 @@ class Popper():
                 if settings.noisy:
                     # if a program of size k covers less than k positive examples, we can prune its specialisations
                     # otherwise no useful mdl induction has taken place
-                    if tp <= prog_size:
+                    if tp <= prog_size or precision < settings.precision_bound:
                         add_spec = True
 
                     # we can prune specialisations with size greater than prog_size+fp or tp
@@ -429,7 +435,7 @@ class Popper():
                     else:
                         # only prune if the generalisation bounds are smaller than existing bounds
                         gen_size_ = min([fn + prog_size, num_pos-fp, settings.best_mdl - mdl + num_pos + prog_size])
-                        if gen_size_ <= prog_size:
+                        if gen_size_ <= prog_size or recall < settings.recall_bound:
                             add_gen = True
                         if gen_size_ < settings.max_literals:
                             gen_size = gen_size_
@@ -816,6 +822,8 @@ class Popper():
             if settings.single_solve:
                 break
         assert(len(to_combine) == 0)
+        if settings.noisy:
+            self.tactic_file.close()
 
     def filter_combine_programs(self, combiner, to_combine):
 
