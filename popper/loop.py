@@ -289,8 +289,9 @@ class Popper():
                         if tp + fn > 0:
                             recall = tp / (tp + fn)
                         if settings.debug:
-                            settings.logger.debug(f'tp:{tp} fn:{fn} tn:{tn} fp:{fp} mdl:{mdl}')
-                        if (not precision or precision >= settings.precision_bound) and (not recall or recall >= settings.recall_bound):
+                            settings.logger.debug(f'precision:{precision} recall:{recall} mdl:{mdl}')
+                        # Only write to file when precision and recall are above precision bound and are computable
+                        if precision >= settings.precision_bound and recall >= settings.recall_bound:
                             self.tactic_file.write(f'{format_prog(prog)}\n% tp:{tp} fn:{fn} tn:{tn} fp:{fp} mdl:{mdl}\n')
                         saved_scores[prog] = [fp, fn, prog_size]
                         if not min_score:
@@ -380,19 +381,20 @@ class Popper():
                         subsumed_prog_ = frozenset(remap_variables(rule) for rule in subsumed_prog)
                         new_cons.append((Constraint.SPECIALISATION, subsumed_prog_))
 
-                if not settings.noisy and not pruned_more_general:
-                    if inconsistent:
-                        # if inconsistent, prune generalisations
-                        add_gen = True
-                        if is_recursive:
-                            combiner.add_inconsistent(prog)
-                            cons_ = frozenset(self.explain_inconsistent(prog))
-                            new_cons.extend(cons_)
-                            pruned_sub_inconsistent = len(cons_) > 0
-                    else:
-                        # if consistent, prune specialisations
-                        add_spec = True
-                        neg_covered = frozenset()
+                # To match: https://github.com/jaix131/chess/commit/8f6c1ad183b4a460ff1c0982067da62270bbf35f
+                # if not settings.noisy and not pruned_more_general:
+                #     if inconsistent:
+                #         # if inconsistent, prune generalisations
+                #         add_gen = True
+                #         if is_recursive:
+                #             combiner.add_inconsistent(prog)
+                #             cons_ = frozenset(self.explain_inconsistent(prog))
+                #             new_cons.extend(cons_)
+                #             pruned_sub_inconsistent = len(cons_) > 0
+                #     else:
+                #         # if consistent, prune specialisations
+                #         add_spec = True
+                #         neg_covered = frozenset()
 
                     # if consistent and partially complete, test whether functional
                     if not inconsistent and settings.functional_test and tp > 0 and not pruned_more_general:
@@ -498,40 +500,40 @@ class Popper():
                     #     print('inconsistent == fp>0', inconsistent == fp>0)
                     #     assert(inconsistent == fp>0)
 
-                    if not ignore_this_prog and (inconsistent or fp>0):
-                        # neg_covered is a subset of all programs in s_neg
-                        s_neg = set.intersection(*(covered_by_neg[ex] for ex, ex_covered_ in enumerate(neg_covered) if ex_covered_ == 1))
-                        # if neg_covered(new) ⊆ neg_covered(old)
-                        for prog1 in s_neg:
-                            # if pos_covered(old) ⊆ pos_covered(new)
-                            if subset(coverage_pos[prog1], pos_covered):
-                                size1, tp1, fp1 = scores[prog1]
-                                if size1 == prog_size:
-                                    # ignore OLD
-                                    # print('ignore old')
-                                    local_delete.add(prog1)
-                                    continue
+                    # if not ignore_this_prog and (inconsistent or fp>0):
+                    #     # neg_covered is a subset of all programs in s_neg
+                    #     s_neg = set.intersection(*(covered_by_neg[ex] for ex, ex_covered_ in enumerate(neg_covered) if ex_covered_ == 1))
+                    #     # if neg_covered(new) ⊆ neg_covered(old)
+                    #     for prog1 in s_neg:
+                    #         # if pos_covered(old) ⊆ pos_covered(new)
+                    #         if subset(coverage_pos[prog1], pos_covered):
+                    #             size1, tp1, fp1 = scores[prog1]
+                    #             if size1 == prog_size:
+                    #                 # ignore OLD
+                    #                 # print('ignore old')
+                    #                 local_delete.add(prog1)
+                    #                 continue
 
-                                if fp == fp1 and (tp-prog_size) < (tp1-size1):
-                                    # NEW tp:50 fp:1 size:6 memberofdomainregion(V0,V1):- synsetdomaintopicof(V2,V3),synsetdomaintopicof(V1,V3),hypernym(V2,V4),membermeronym(V0,V5),synsetdomaintopicof(V2,V4).
-                                    # OLD tp:49 fp:1 size:4 memberofdomainregion(V0,V1):- synsetdomaintopicof(V1,V3),instancehypernym(V2,V3),membermeronym(V0,V4).
-                                    # print('skip2')
-                                    ignore_this_prog = True
-                                    break
+                    #             if fp == fp1 and (tp-prog_size) < (tp1-size1):
+                    #                 # NEW tp:50 fp:1 size:6 memberofdomainregion(V0,V1):- synsetdomaintopicof(V2,V3),synsetdomaintopicof(V1,V3),hypernym(V2,V4),membermeronym(V0,V5),synsetdomaintopicof(V2,V4).
+                    #                 # OLD tp:49 fp:1 size:4 memberofdomainregion(V0,V1):- synsetdomaintopicof(V1,V3),instancehypernym(V2,V3),membermeronym(V0,V4).
+                    #                 # print('skip2')
+                    #                 ignore_this_prog = True
+                    #                 break
 
-                                if tp == tp1 and (fp+prog_size) >= (fp1+size1):
-                                    # NEW tp:10 fp:1 mdl:350 less_toxic(V0,V1):- ring_subst_3(V1,V4),ring_substitutions(V1,V3),alk_groups(V0,V3),x_subst(V0,V2,V5).
-                                    # OLD tp:10 fp:2 mdl:350 less_toxic(V0,V1):- ring_substitutions(V0,V4),x_subst(V0,V3,V2),ring_subst_3(V1,V5).
-                                    # print('skip3')
-                                    ignore_this_prog = True
-                                    break
+                    #             if tp == tp1 and (fp+prog_size) >= (fp1+size1):
+                    #                 # NEW tp:10 fp:1 mdl:350 less_toxic(V0,V1):- ring_subst_3(V1,V4),ring_substitutions(V1,V3),alk_groups(V0,V3),x_subst(V0,V2,V5).
+                    #                 # OLD tp:10 fp:2 mdl:350 less_toxic(V0,V1):- ring_substitutions(V0,V4),x_subst(V0,V3,V2),ring_subst_3(V1,V5).
+                    #                 # print('skip3')
+                    #                 ignore_this_prog = True
+                    #                 break
 
-                                if (tp-fp-prog_size) <= (tp1-fp1-size1):
-                                    # NEW tp:12 fp:3 size:7 less_toxic(V0,V1):- gt(V2,V5),gt(V2,V3),ring_subst_2(V1,V4),ring_substitutions(V0,V3),alk_groups(V0,V2),ring_substitutions(V1,V5).
-                                    # OLD tp:11 fp:4 size:3 less_toxic(V0,V1):- ring_subst_2(V1,V3),r_subst_3(V0,V2).
-                                    # print('skip4')
-                                    ignore_this_prog = True
-                                    break
+                    #             if (tp-fp-prog_size) <= (tp1-fp1-size1):
+                    #                 # NEW tp:12 fp:3 size:7 less_toxic(V0,V1):- gt(V2,V5),gt(V2,V3),ring_subst_2(V1,V4),ring_substitutions(V0,V3),alk_groups(V0,V2),ring_substitutions(V1,V5).
+                    #                 # OLD tp:11 fp:4 size:3 less_toxic(V0,V1):- ring_subst_2(V1,V3),r_subst_3(V0,V2).
+                    #                 # print('skip4')
+                    #                 ignore_this_prog = True
+                    #                 break
 
                     # backtrack prune for consistent programs
                     if not inconsistent:
@@ -1906,6 +1908,7 @@ def find_pointless_relations(settings):
     encoding.append('\n')
     with open(settings.bk_file) as f:
         bk = f.read()
+        # bk += "\n :- set_prolog_flag(answer_write_options, [max_depth(0)]).\n"
         encoding.append(bk)
 
     encoding = '\n'.join(encoding)
@@ -1930,32 +1933,40 @@ def find_pointless_relations(settings):
                 if a not in pointless and b not in pointless:
                     if a in keep:
                         pointless.add(b)
-                        # print('drop1', b)
+                        if settings.showcons:
+                            print('drop1', b)
                     elif b in keep:
                         pointless.add(a)
-                        # print('drop1', a)
+                        if settings.showcons:
+                            print('drop1', a)
                     else:
                         keep.add(a)
                         pointless.add(b)
-                        # print('drop1', b)
+                        if settings.showcons:
+                            print('drop1', b)
                 elif a in pointless or b in pointless:
                     if a not in keep:
                         pointless.add(a)
-                        # print('drop5', a)
+                        if settings.showcons:
+                            print('drop5', a)
                     if b not in keep:
                         pointless.add(b)
-                        # print('drop5', b)
+                        if settings.showcons:
+                            print('drop5', b)
                 elif a not in pointless and b not in pointless:
                     keep.add(a)
                     pointless.add(b)
-                    # print('drop2', b)
+                    if settings.showcons:
+                        print('drop2', b)
                 elif a in pointless:
                     pointless.add(b)
-                    # print('drop3', b)
+                    if settings.showcons:
+                        print('drop3', b)
                 elif b in pointless:
                     pointless.add(b)
-                    # print('keep', a)
-                    # print('drop4', b)
+                    if settings.showcons:
+                        print('keep', a)
+                        print('drop4', b)
 
 
                 # if a in keep and b in keep:
